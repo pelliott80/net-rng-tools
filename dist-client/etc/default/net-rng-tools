@@ -1,0 +1,27 @@
+# Configuration for the net-rng-tools initscript
+
+
+# This is a POSIX shell fragment
+
+# host to get random numbers from
+RNGHOST=mypi
+# port to get random numbers from
+RNGPORT=540
+
+# command to get random numbers
+#RNGNETCMD="/bin/nc $RNGHOST $RNGPORT"
+RNGNETCMD="/usr/bin/socat -u OPENSSL:$RNGHOST:$RNGPORT,cert=/etc/ssl/certs/rand-client.pem,cafile=/etc/ssl/certs/rand-server.crt - "
+
+# program to add random number from net to
+# pool
+DAEMON=/usr/local/sbin/net-rngdV
+
+# rng-tools tool to add random bytes to pool
+RNGD=/usr/sbin/rngd
+
+
+
+RNGDOPTIONS="--fill-watermark=90%"
+
+RNGWAIT=360
+

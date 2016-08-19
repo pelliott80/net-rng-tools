@@ -1,0 +1,36 @@
+#! /bin/bash
+#
+# bash is required sh won't work becasue the "<()" feature is used.
+#
+
+
+
+RNGD=/usr/sbin/rngd
+
+
+SWITCH="-r"
+
+PORT=540
+CERT=/etc/ssl/certs/rand-client.pem
+CAFILE=/etc/ssl/certs/rand-server.crt
+
+RNGNETCMD="/usr/bin/socat -u OPENSSL:mypi:$PORT,cert=$CERT,cafile=$CAFILE -"
+
+
+
+
+RNGDOPTIONS="--fill-watermark=90%"
+
+
+
+
+
+
+
+#echo " $RNGNETCMD   |     $RNGD -f $SWITCH /dev/stdin $RNGDOPTIONS" >/tmp/t.tmp
+
+ $RNGNETCMD   |     $RNGD -f $SWITCH /dev/stdin $RNGDOPTIONS
+
+
+
+

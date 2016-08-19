@@ -1,0 +1,99 @@
+#! /bin/sh
+#
+# net-rng-tools	initscript for the rng-tools package
+#		Copr. 2003 by Henrique de Moraes Holschuh <hmh@debian.org>
+#		Copr. 2002 by Viral Shah <viral@debian.org>
+#
+### BEGIN INIT INFO
+# Provides:		net-rng-tools
+# Required-Start:	$remote_fs $syslog $network
+# Required-Stop:	$remote_fs $syslog $network
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+### END INIT INFO
+#
+#
+# $Id: rng-tools.init,v 1.6.2.10 2008-06-10 19:51:37 hmh Exp $
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+#change
+DAEMON=/usr/local/sbin/net-rngd
+NAME=net-rngd
+DESC="Network Hardware RNG entropy gatherer daemon"
+PIDFILE=/var/run/net-rngd.pid
+
+
+#RNGNETCMD=/dev/hwrng
+RNGDOPTIONS=
+[ -r /etc/default/net-rng-tools ] && . /etc/default/net-rng-tools
+
+test -f ${DAEMON} || exit 0
+
+set -e
+
+START="--start --quiet --pidfile ${PIDFILE} --startas ${DAEMON} --name ${NAME}"
+
+case "$1" in
+  start)
+	echo -n "Starting $DESC: "
+
+	START="${START} -- ${RNGD} -r   "
+
+	if start-stop-daemon -b ${START} "${RNGNETCMD}" ${RNGWAIT} ${RNGDOPTIONS} >/dev/null 2>&1 ; then
+		echo "${NAME}."
+	else
+		if start-stop-daemon --test ${START} "${RNGNETCMD}" ${RNGWAIT} ${RNGDOPTIONS} >/dev/null 2>&1; then
+		echo e ${START} "${RNGNETCMD}" ${RNGDOPTIONS}
+			echo "(failed)."
+			exit 1
+		else
+			echo "${DAEMON} already running."
+			exit 0
+		fi
+	fi
+	;;
+  stop)
+	echo -n "Stopping $DESC: "
+
+
+	if start-stop-daemon --status --quiet --pidfile ${PIDFILE} -s 1 \
+		--startas ${DAEMON} --retry 10 --name ${NAME} \
+		>/dev/null 2>&1 ; then
+			echo "${NAME}."
+
+
+        if [ -r ${PIDFILE} ] ; then
+	    pkill -HUP -P $(cat ${PIDFILE})
+	fi
+
+	if start-stop-daemon --stop --quiet --pidfile ${PIDFILE} -s 1 \
+		--startas ${DAEMON} --retry 10 --name ${NAME} \
+		>/dev/null 2>&1 ; then
+			echo "${NAME}."
+	else
+		if start-stop-daemon --test ${START} "${RNGNETCMD}" ${RNGWAIT} ${RNGDOPTIONS} >/dev/null 2>&1; then
+			echo "(not running)."
+			exit 0
+		else
+			echo "(failed)."
+			exit 1
+		fi
+	fi
+	rm -f ${PIDFILE}
+
+	fi
+
+
+
+	;;
+  restart|force-reload)
+	$0 stop
+	exec $0 start	    
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart|force-reload}" 1>&2
+	exit 1
+	;;
+esac
+
+exit 0

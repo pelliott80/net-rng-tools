@@ -1,0 +1,18 @@
+# Author: Paul Elliott <pelliott@blackpatchpanel.com>
+#
+# License GPLv2+
+[Unit]
+Description=Add entropy to /dev/random 's pool from remote network's process.
+After=network-online.target
+Requires=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/net-rngdD
+KillMode=control-group
+RestartSec=3min
+Restart=always
+
+[Install]
+WantedBy=basic.target
+

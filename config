@@ -1,0 +1,299 @@
+#-!/bin/bash
+
+CLIENT=client
+SERVER=server
+
+if [[ -d client ]]
+then
+    echo delete client
+    rm -r client
+fi
+cp -ax dist-client client
+
+
+if [[ -d server ]]
+then
+    echo delete server
+    rm -r server
+fi
+cp -ax dist-server server
+
+#these are file that we distribute without modification
+
+cat <<EOF >client-list
+etc/systemd/system/net-rng-tools.service
+EOF
+
+cat <<EOF >server-list
+EOF
+#these are only the .pem .crt files.
+
+cat <<EOF >client-kc-list
+EOF
+
+cat <<EOF >server-kc-list
+EOF
+
+TCPPORT=$1
+
+if [[ $TCPPORT == "" ]] ; then
+
+    echo "The TCP PORT number is used to communicate between server and client"
+    echo "this must not conflict with any other port number being used on your lan"
+    read -p "Enter the TCP PORT number : " TCPPORT
+
+fi
+
+
+re='^[0-9]+$'
+if ! [[ $TCPPORT =~ $re ]] ; then
+   echo "error: $TCPPORT is not a valid port number" >&2; exit 1
+fi
+
+echo "TCPPORT=$TCPPORT"
+
+BITS=$2
+
+if [[ $BITS == "" ]] ; then
+
+    echo "The keysize is the number of bits used by the keys"
+    echo "2048 is probably good for now 4096 good for indefinite future"
+    read -p "Enter the keysize : " BITS
+
+fi
+
+if [[ $BITS == "" ]] ; then
+
+    BITS=2048
+
+fi
+
+echo "bits=$BITS"
+
+re='^[0-9]+$'
+if ! [[ $BITS =~ $re ]] ; then
+   echo "error: $BITS is not a valid bit number" >&2; exit 1
+fi
+
+
+
+DAYS=$3
+
+if [[ $DAYS == "" ]] ; then
+
+    echo "the key will expire at some point determined by the days parameter"
+    echo "36530 is 100 years, 3653 is 10 years, 365 is about 1 year "
+    read -p "Enter the number of days till key expiration : " DAYS
+
+fi
+
+if [[ $DAYS == "" ]] ; then
+
+    DAYS=36530
+
+fi
+
+echo "DAYS=$DAYS"
+
+re='^[0-9]+$'
+if ! [[ $DAYS =~ $re ]] ; then
+   echo "error: $DAYS is not a valid number of days" >&2; exit 1
+fi
+
+#leading / left of cause using tarballs to install.
+
+
+#location for software installed by local admin
+BINSBIN="usr/local/sbin/"
+
+#location for part of a package
+#BINSBIN=usr/sbin
+
+#location for systemd services installed by local admin
+SYSDLOC="etc/systemd/system/"
+
+#location for systed services part of package
+#SYSDLOC="usr/lib/systemd/system/"
+
+RNGDDLOC=${BINSBIN}net-rngdD
+
+SERVERSERVICELOC=${SYSDLOC}rand-server.service
+
+sed -e "s/REPLACE_TCP_PORT/$TCPPORT/g" net-rngdD.template > $CLIENT/$RNGDDLOC
+echo $RNGDDLOC >>client-list
+
+sed -e "s/REPLACE_TCP_PORT/$TCPPORT/g" rand-server.service.template > $SERVER/$SERVERSERVICELOC
+echo $SERVERSERVICELOC >>server-list
+
+BOTH="$RNGDDLOC $SERVERSERVICELOC"
+
+#everybody reads user=owner=root can write, and net-rngdD is executeable
+
+echo chmod a=r $BOTH
+
+echo chmod u+w $BOTH
+
+echo chmod a+x $RNGDDLOC
+
+cat << EOF
+Now creating client .pem and .crt files!
+Normally you would be prompted for
+       Country Name (2 char)
+       State or Province
+       Locality
+       Organization Name
+       Organizational Unit Name
+       Common Name
+       Email
+
+This data is not used by socat so it is set to blank except
+the email address which is nobody@nowhere.com
+
+You can fill these in or just hit return.
+
+EOF
+
+read -p "Country code 2 char, US, UK, AU, ect. : " CO
+read -p "State or Province : " ST
+read -p "Locality : " LO
+read -p "Organization Name : " OR
+read -p "Client Organizational Unit Name : " CU
+read -p "Server Organizational Unit Name : " SU
+read -p "Common Name : " CN
+read -p "Email : " EM
+
+if [[ $CO == "" ]]
+then
+    CO="."
+fi
+
+
+if [[ $ST == "" ]]
+then
+    ST="."
+fi
+
+
+if [[ $LO == "" ]]
+then
+    LO="."
+fi
+
+
+if [[ $OR == "" ]]
+then
+    OR="."
+fi
+
+
+if [[ $CU == "" ]]
+then
+    CU="RNG client"
+fi
+
+
+if [[ $SU == "" ]]
+then
+    SU="RNG server"
+fi
+
+
+if [[ $CN == "" ]]
+then
+    CN="."
+fi
+
+
+if [[ $EM == "" ]]
+then
+    EM="nobody@nowhere.com"
+fi
+
+#bugfix for problem
+#socat[6836] E SSL_connect(): error:14082174:SSL
+#routines:SSL3_CHECK_CERT_AND_ALGORITHM:dh key too small
+#solution found https://youremindmeofmymother.com/2015/08/21/socat-ssl-ssl-routinesssl3_check_cert_and_algorithmdh-key-too-small/
+
+openssl dhparam -out dhparams.pem $BITS
+
+
+#THIS CODE FROM http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html
+
+FILENAME=rand-client
+
+openssl genrsa -out $FILENAME.key $BITS
+
+openssl req -new -key $FILENAME.key -x509 -days $DAYS -out $FILENAME.crt  <<EOF
+$CO
+$ST
+$LO
+$OR
+$CU
+$CN
+$EM
+EOF
+
+#dhparams.pem from bugfix
+
+cat $FILENAME.key $FILENAME.crt dhparams.pem >$FILENAME.pem
+
+chmod 600 $FILENAME.key $FILENAME.pem
+
+
+
+#THIS CODE FROM http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html
+
+FILENAME=rand-server
+
+openssl genrsa -out $FILENAME.key $BITS
+
+openssl req -new -key $FILENAME.key -x509 -days $DAYS -out $FILENAME.crt <<EOF
+$CO
+$ST
+$LO
+$OR
+$SU
+$CN
+$EM
+EOF
+
+#dhparams.pem from bugfix
+
+cat $FILENAME.key $FILENAME.crt dhparams.pem >$FILENAME.pem
+
+chmod 600 $FILENAME.key $FILENAME.pem
+
+#bugfix file
+rm dhparams.pem
+
+#keys nat used after being incorporated into the .pem
+
+rm rand-*.key
+
+CERTLOC="etc/ssl/certs"
+
+for KIND in server client
+do
+    echo kind=$KIND
+    for x in server client
+    do
+	if [[ $KIND != $x ]]
+	then
+	    OTHER=$x
+	fi
+    done
+    echo OTHER=$OTHER
+    mv rand-${KIND}.pem ${KIND}/${CERTLOC}/rand-${KIND}.pem
+    echo ${CERTLOC}/rand-${KIND}.pem >>${KIND}-list
+    echo ${CERTLOC}/rand-${KIND}.pem >>${KIND}-kc-list
+    mv rand-${KIND}.crt ${OTHER}/${CERTLOC}/rand-${KIND}.crt
+    echo ${CERTLOC}/rand-${KIND}.crt >>${OTHER}-list
+    echo ${CERTLOC}/rand-${KIND}.crt >>${OTHER}-kc-list
+done
+
+
+for KIND in server client
+do
+    (cd $KIND;tar cjvf ../$KIND.tar.bz2 $(<../${KIND}-list ) )
+    (cd $KIND;tar cjvf ../$KIND.kc.tar.bz2 $(<../${KIND}-kc-list ) )
+done

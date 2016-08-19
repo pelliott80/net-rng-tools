@@ -1,0 +1,16 @@
+[Unit]
+Description=serves entropy to clients without hardware RNG
+After=networking.service
+Requires=networking.service
+After=rng-tools.service
+Requires=rng-tools.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/socat -U OPENSSL-LISTEN:540,reuseaddr,fork,cert=/etc/ssl/certs/rand-server.pem,cafile=/etc/ssl/certs/rand-client.crt OPEN:/dev/random
+KillMode=control-group
+RestartSec=60
+
+[Install]
+WantedBy=basic.target
+

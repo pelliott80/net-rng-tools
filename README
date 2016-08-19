@@ -1,0 +1,62 @@
+
+This software allows a server with a hardware RNG to serve random
+numbers to other clients on the lan.
+
+
+Dependancies:
+openssl, socat, rng-tools, systemd must be installed on client, server
+
+but you will want to disable rng-tools.service in systemd for client
+because your native hardware RNG does not work. Or else why are you
+using this?
+
+This software was developed and tested with the server being
+a raspberry PI.
+
+To get the RNG working on the Raspberry pi:
+1) do "sudo modprobe bcm2708-rng" to get the RNG running on the running system.
+
+2) add a line saying "bcm2708-rng" to /etc/modules
+   This will insure it keeps working when you reboot.
+
+3) install rng-tools
+   "sudo apt-get install rng-tools"
+
+4) Edit /etc/default/rng-tools to say:
+
+    HRNGDEVICE=/dev/hwrng
+    
+    then restart rng-tools.
+    sudo systemctl restart rng-tools.service
+    or
+    sudo /etc/init.d/rng-tools restart
+
+
+
+The client was a INTEL, without a hardware RNG, running DEBIAN.
+
+
+systemd service files
+in /etc/systemd/system
+
+./client/etc/systemd/system/net-rng-tools.service
+./server/etc/systemd/system/rand-server.service
+
+
+
+after these installed on client or server:
+      	    systemctl daemon-reload
+	    systemctl start net-rng-tools.service #for client
+	    systemctl start rand-server.service   #for server
+
+
+
+The /etc/ssl/certs/rand-*  files should be uniquely generated
+for your installation for security. You should not use my example
+files.
+
+This page:
+http://www.dest-unreach.org/socat/doc/socat-openssltunnel.html
+
+describes how to generate these files.
+
