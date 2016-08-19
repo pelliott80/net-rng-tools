@@ -34,6 +34,23 @@ EOF
 cat <<EOF >server-kc-list
 EOF
 
+HOSTNAME=$1
+shift
+
+
+if [[ $HOSTNAME == "" ]] ; then
+
+   cat << EOF
+   The server HOSTNAME is the name used to indicate the server.
+   The client will attempt to connect to the TCP PORT on this host.
+EOF
+
+    read -p "Enter the server HOSTNAME number : " HOSTNAME
+
+fi
+
+
+
 TCPPORT=$1
 
 if [[ $TCPPORT == "" ]] ; then
@@ -119,7 +136,10 @@ RNGDDLOC=${BINSBIN}net-rngdD
 
 SERVERSERVICELOC=${SYSDLOC}rand-server.service
 
-sed -e "s/REPLACE_TCP_PORT/$TCPPORT/g" net-rngdD.template > $CLIENT/$RNGDDLOC
+sed -e "s/REPLACE_HOSTNAME/$HOSTNAME/g"		\
+-e "s/REPLACE_TCP_PORT/$TCPPORT/g" 		\
+net-rngdD.template > $CLIENT/$RNGDDLOC
+
 echo $RNGDDLOC >>client-list
 
 sed -e "s/REPLACE_TCP_PORT/$TCPPORT/g" rand-server.service.template > $SERVER/$SERVERSERVICELOC
