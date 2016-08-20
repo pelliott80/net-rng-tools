@@ -273,7 +273,7 @@ $ST
 $LO
 $OR
 $SU
-$CN
+$HOSTNAME
 $EM
 EOF
 
