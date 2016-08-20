@@ -1,0 +1,201 @@
+In order to get this software to work, things have to be coordinated
+between the server and the clients.
+
+A TCP port number has to be chosen that does not conflict with others
+being used by other processes.
+
+The hostname of the server has to be known.
+
+The client and server SSL keys and certificates have to be generated
+and distributed.
+
+Most of this organization can be done by the bash script config.
+
+The server must have a hardware RNG. My server is a Raspberry PI.
+
+The client typically does not have a hardware RNG, or else why are you
+using this? Nevertheless, rng-tools must be installed on the client, because
+rngd is used. But because there is no hardware RNG on the client, you will
+want to disable the script, currently sysv init.
+# systemctl disable rng-tools.service
+
+How to install the RNG on a raspberry pi:
+To get the RNG working on the Raspberry pi:
+1) do "sudo modprobe bcm2708-rng" to get the RNG running on the running system.
+
+2) add a line saying "bcm2708-rng" to /etc/modules
+   This will insure it keeps working when you reboot.
+
+3) install rng-tools
+   "sudo apt-get install rng-tools"
+
+4) Edit /etc/default/rng-tools to say:
+
+    HRNGDEVICE=/dev/hwrng
+    
+    then restart rng-tools.
+    sudo systemctl restart rng-tools.service
+    or
+    sudo /etc/init.d/rng-tools restart
+
+Do the above on both the client and the server before proceeding to
+configuration.
+
+1) Decide on the hostname of the server.
+2) Decide on a TCP port that can be used without conflict.
+3) Decide on a RSA keysize.
+4) Decide on a expiration time for the keys.
+
+In the git base directory, or a recursive copy thereof, run config
+as an ordinary user.
+
+$ ./config
+	delete client
+	delete server
+	   The server HOSTNAME is the name used to indicate the server.
+	   The client will attempt to connect to the TCP PORT on this host.
+	Enter the server HOSTNAME  : mypi
+	The TCP PORT number is used
+	to communicate between server and client
+	this must not conflict with any other port number being used on your lan
+	Enter the TCP PORT number : 540
+	TCPPORT=540
+	The keysize is the number of bits used by the keys
+	2048 is probably good for now 4096 good for indefinite future
+	Enter the keysize : 2048
+	bits=2048
+	the key will expire at some point determined by the days parameter
+	36530 is 100 years, 3653 is 10 years, 365 is about 1 year 
+	Enter the number of days till key expiration : 36530
+	DAYS=36530
+	chmod a=r usr/local/sbin/net-rngdD etc/systemd/system/rand-server.service
+	chmod u+w usr/local/sbin/net-rngdD etc/systemd/system/rand-server.service
+	chmod a+x usr/local/sbin/net-rngdD
+	Now creating client .pem and .crt files!
+	Normally you would be prompted for
+	       Country Name (2 char)
+	       State or Province
+	       Locality
+	       Organization Name
+	       Organizational Unit Name
+	       Common Name
+	       Email
+	
+	This data is not used by socat so it is set to blank except
+	the email address which is nobody@nowhere.com
+	
+	You can fill these in or just hit return.
+	
+	Country code 2 char, US, UK, AU, ect. : US
+	State or Province : IN
+	Locality : New Albany
+	Organization Name : PAULNET
+	Client Organizational Unit Name :
+	Server Organizational Unit Name :
+	Common Name : Paul Elliott
+	Email : pelliott@blackpatchpanel.com
+	Generating DH parameters, 2048 bit long safe prime, generator 2
+	This is going to take a long time
+	............................
+	Generating RSA private key, 2048 bit long modulus
+	....................................................................+++
+	...........+++
+	e is 65537 (0x10001)
+	You are about to be asked to enter information that will be incorporated
+	into your certificate request.
+	What you are about to enter is what is called a Distinguished Name or a DN.
+	There are quite a few fields but you can leave some blank
+	For some fields there will be a default value,
+	If you enter '.', the field will be left blank.
+	-----
+	Country Name (2 letter code) [AU]:State or Province
+	Name (full name) [Some-State]:Locality Name (eg, city) []:
+	Organization Name (eg, company)
+	[Internet Widgits Pty Ltd]:
+	Organizational Unit Name (eg, section) []:
+	Common Name (e.g. server FQDN or YOUR name) []:
+	Email Address []:Generating RSA private key, 2048 bit long modulus
+	............................+++
+	.................+++
+	e is 65537 (0x10001)
+	You are about to be asked to enter information that will be incorporated
+	into your certificate request.
+	What you are about to enter is what is called a Distinguished Name or a DN.
+	There are quite a few fields but you can leave some blank
+	For some fields there will be a default value,
+	If you enter '.', the field will be left blank.
+	-----
+	Country Name (2 letter code) [AU]:
+	State or Province Name (full name) [Some-State]:
+	Locality Name (eg, city) []:
+	Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+	Organizational Unit Name (eg, section) []:
+	Common Name (e.g. server FQDN or YOUR name) []:Email Address []:kind=server
+	OTHER=client
+	kind=client
+	OTHER=server
+	etc/systemd/system/rand-server.service
+	etc/ssl/certs/rand-server.pem
+	etc/ssl/certs/rand-client.crt
+	etc/ssl/certs/rand-server.pem
+	etc/ssl/certs/rand-client.crt
+	etc/systemd/system/net-rng-tools.service
+	usr/local/sbin/net-rngdD
+	etc/ssl/certs/rand-server.crt
+	etc/ssl/certs/rand-client.pem
+	etc/ssl/certs/rand-server.crt
+	etc/ssl/certs/rand-client.pem
+
+
+2 sub directories will be created: client and server
+these are the files that need to be installed with
+their permissions on the client and the server, relative
+to the root directory ( / ).
+
+Also two tarballs created client.tar.bz2 and server.tar.bz2.
+
+
+IMPORTANT!
+These directories and tarballs and directories are PAIRED!
+A client.tar.bz2 file will only work with a server whose
+server.tar.bz2 software was created in the same ./config run!
+
+This is because the files come with keys and certificates that
+must match up!
+
+Assuming you have copied these files to the /tmp directories on the
+server and the client. Here is how to install.
+
+ON THE SERVER
+# cd /
+/# tar xjvf /tmp/server.tar.bz2
+/# systemctl daemon-reload
+/# systemctl start rand-server.service
+/# systemctl enable rand-server.service
+
+check that it is running
+# ps -Af|grep socat
+if you see socat running you are probably OK.
+
+ON THE CLIENT
+# cd /
+/# tar xjvf /tmp/client.tar.bz2
+/# systemctl daemon-reload
+/# systemctl start net-rng-tools.service
+/# systemctl enable net-rng-tools.service
+
+check that it is running
+# ps -Af|grep socat
+if you see socat running you are probably OK.
+
+
+check that /dev/random is fast!
+ from a user window try
+
+$ od -x -N 1K /dev/random
+
+
+If it pauses waiting for entropy it probably isn't working.
+Your /dev/random is slow.
+If if runs fast as lightning it is because random numbers are
+comming from the RPI.
